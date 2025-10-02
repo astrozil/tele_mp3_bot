@@ -107,6 +107,34 @@ bot.on('text', async ctx => {
   }
 });
 
+// ---- Channel posts handler (NEW) ----
+bot.on('channel_post', async ctx => {
+  const post = ctx.update.channel_post;
+  const text = post?.text || post?.caption || '';
+  const id = extractYouTubeId(text);
+  if (!id) return; // ignore non-YouTube posts
+
+  try { await ctx.sendChatAction('upload_audio'); } catch {}
+
+  try {
+    const meta = await fetchMp3Meta(id);
+
+    if (typeof meta.filesize === 'number' && meta.filesize > 49 * 1024 * 1024) {
+      return ctx.reply('File is too large for Telegram. Try a shorter video.');
+    }
+
+    await ctx.replyWithAudio(meta.link, {
+      title: meta.title || 'Audio',
+      performer: 'YouTube',
+      duration: Math.round(Number(meta.duration || 0)) || undefined,
+      caption: meta.title ? `🎵 ${meta.title}` : undefined
+    });
+  } catch (e) {
+    console.error(e);
+    await ctx.reply('Sorry, couldn’t get that MP3. Try another link or later.');
+  }
+});
+
 // ---- Webhook endpoint (Telegram -> your server) ----
 app.post(`/webhook/${WEBHOOK_SECRET}`, (req, res) => {
   // Verify Telegram secret header
